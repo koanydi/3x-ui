@@ -16,6 +16,7 @@ import {
   Space,
   Switch,
   Tabs,
+  Tag,
   Tooltip,
   Typography,
   message,
@@ -39,6 +40,7 @@ import {
   dropLegacyOptionalEmpties,
 } from '@/lib/xray/inbound-form-adapter';
 import { createDefaultInboundSettings } from '@/lib/xray/inbound-defaults';
+import { INBOUND_PRESETS, PRESET_FALLBACK, type InboundPreset } from '@/lib/xray/inbound-presets';
 import {
   canEnableReality,
   canEnableStream,
@@ -327,6 +329,10 @@ export default function InboundFormModal({
   const [saving, setSaving] = useState(false);
   const fallbackKeyRef = useRef(0);
   const [fallbacks, setFallbacks] = useState<FallbackRow[]>([]);
+  // One-click preset state. selectedPresetId tracks which gallery card is
+  // active so we can show its domain input (TLS presets) and highlight it.
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [presetDomain, setPresetDomain] = useState('');
 
   const selectableNodes = (availableNodes || []).filter((n) => n.enable);
   const protocol = (Form.useWatch('protocol', form) ?? '') as string;
@@ -510,6 +516,32 @@ export default function InboundFormModal({
     } finally {
       setSaving(false);
     }
+  };
+
+  // Apply a one-click preset: build a full inbound row, push it into the form
+  // through the same adapter buildAddModeValues() uses, then fetch Reality
+  // keys for Reality presets. The operator can still tweak anything before
+  // hitting Create — the preset only seeds a working starting point.
+  const applyPreset = async (preset: InboundPreset) => {
+    const domain = preset.needsDomain ? presetDomain : undefined;
+    const row = preset.build(domain);
+    const values = rawInboundToFormValues(row);
+    form.resetFields();
+    form.setFieldsValue(values);
+    setFallbacks([]);
+    setSelectedPresetId(preset.id);
+    if (preset.needsRealityKeys) {
+      await genRealityKeypair();
+    }
+  };
+
+  // Re-seed the SNI/serverName on a TLS preset when the operator edits the
+  // domain box, without rebuilding the whole form (which would regenerate the
+  // client/keys). Applies to the active preset only.
+  const onPresetDomainChange = (value: string) => {
+    setPresetDomain(value);
+    const trimmed = value.trim();
+    form.setFieldValue(['streamSettings', 'tlsSettings', 'serverName'], trimmed);
   };
 
   const clearRealityKeypair = () => {
@@ -749,6 +781,8 @@ export default function InboundFormModal({
       : buildAddModeValues();
     form.resetFields();
     form.setFieldsValue(initial);
+    setSelectedPresetId(null);
+    setPresetDomain('');
     if (
       mode === 'edit'
       && dbInbound
@@ -881,8 +915,66 @@ export default function InboundFormModal({
     ? t('pages.clients.submitEdit')
     : t('create');
 
+  const activePreset = INBOUND_PRESETS.find((p) => p.id === selectedPresetId) ?? null;
+
+  // One-click preset gallery — add mode only. Each card seeds a full working
+  // inbound; TLS presets reveal a domain input once selected.
+  const presetGallery = mode === 'add' ? (
+    <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { padding: 12 } }}>
+      <Typography.Text strong>{t('pages.inbounds.presets.title', { defaultValue: '一键模板' })}</Typography.Text>
+      <Typography.Paragraph type="secondary" style={{ margin: '4px 0 10px', fontSize: 12 }}>
+        {t('pages.inbounds.presets.subtitle', { defaultValue: '点一下即可填好一套可用配置，创建前可继续微调。' })}
+      </Typography.Paragraph>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {INBOUND_PRESETS.map((preset) => {
+          const active = preset.id === selectedPresetId;
+          return (
+            <Card
+              key={preset.id}
+              size="small"
+              hoverable
+              onClick={() => { void applyPreset(preset); }}
+              style={{
+                width: 220,
+                cursor: 'pointer',
+                borderColor: active ? 'var(--ant-color-primary)' : undefined,
+                background: active ? 'var(--ant-color-primary-bg)' : undefined,
+              }}
+              styles={{ body: { padding: 10 } }}
+            >
+              <Space size={4} wrap>
+                <Typography.Text strong style={{ fontSize: 13 }}>
+                  {t(preset.titleKey, { defaultValue: PRESET_FALLBACK[preset.id].title })}
+                </Typography.Text>
+                {preset.recommended && <Tag color="green" style={{ marginInlineEnd: 0 }}>{t('recommend', { defaultValue: '推荐' })}</Tag>}
+                {preset.needsDomain && <Tag color="orange" style={{ marginInlineEnd: 0 }}>{t('pages.inbounds.presets.needDomain', { defaultValue: '需域名' })}</Tag>}
+              </Space>
+              <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12 }}>
+                {t(preset.descKey, { defaultValue: PRESET_FALLBACK[preset.id].desc })}
+              </Typography.Paragraph>
+            </Card>
+          );
+        })}
+      </div>
+      {activePreset?.needsDomain && (
+        <div style={{ marginTop: 12 }}>
+          <Typography.Text style={{ fontSize: 12 }}>
+            {t('pages.inbounds.presets.domainLabel', { defaultValue: '域名（解析到本机，并需配置证书）' })}
+          </Typography.Text>
+          <Input
+            style={{ marginTop: 4 }}
+            value={presetDomain}
+            placeholder="example.com"
+            onChange={(e) => onPresetDomainChange(e.target.value)}
+          />
+        </div>
+      )}
+    </Card>
+  ) : null;
+
   const basicTab = (
     <>
+      {presetGallery}
       <Form.Item name="tag" hidden noStyle><Input /></Form.Item>
       <Form.Item name="up" hidden noStyle><InputNumber /></Form.Item>
       <Form.Item name="down" hidden noStyle><InputNumber /></Form.Item>
