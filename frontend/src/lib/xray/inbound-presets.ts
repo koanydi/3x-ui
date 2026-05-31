@@ -79,12 +79,30 @@ function realityStream(network: 'tcp' | 'grpc'): Record<string, unknown> {
   return stream;
 }
 
-// A TLS stream block. serverName carries the operator-supplied domain (also
-// the SNI clients send). certificates stays empty — the operator installs the
-// cert separately; an empty array is valid at the form layer.
+// An empty file-backed cert slot. TLS presets ship one of these so the form
+// always has a certificates[0] to write into — the modal auto-fills its
+// certificateFile/keyFile from the panel's own cert when the preset is
+// applied, making TLS presets one-click on a panel that already has SSL.
+function emptyFileCert(): Record<string, unknown> {
+  return {
+    useFile: true,
+    certificateFile: '',
+    keyFile: '',
+    certificate: [],
+    key: [],
+    oneTimeLoading: false,
+    usage: 'encipherment',
+    buildChain: false,
+  };
+}
+
+// A TLS stream block. serverName carries the domain (also the SNI clients
+// send). certificates carries one empty file-cert slot for the modal to
+// auto-fill from the panel cert.
 function tlsStream(network: Record<string, unknown>, domain?: string): Record<string, unknown> {
   const tls = TlsStreamSettingsSchema.parse({}) as Record<string, unknown>;
   tls.serverName = (domain ?? '').trim();
+  tls.certificates = [emptyFileCert()];
   return { ...network, security: 'tls', tlsSettings: tls };
 }
 
@@ -136,6 +154,7 @@ export const INBOUND_PRESETS: readonly InboundPreset[] = [
       settings.clients = [createDefaultHysteriaClient()];
       const tls = TlsStreamSettingsSchema.parse({}) as Record<string, unknown>;
       tls.serverName = (domain ?? '').trim();
+      tls.certificates = [emptyFileCert()];
       return {
         protocol: 'hysteria',
         port: randomPort(),

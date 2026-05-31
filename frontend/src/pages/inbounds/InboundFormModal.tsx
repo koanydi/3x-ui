@@ -518,10 +518,46 @@ export default function InboundFormModal({
     }
   };
 
+  // Derive a domain from a cert path like
+  // /root/cert/<domain>/fullchain.pem → <domain>. Returns '' when the path
+  // doesn't look like that layout.
+  const domainFromCertPath = (certPath: string): string => {
+    const norm = certPath.replace(/\\/g, '/');
+    const m = norm.match(/\/cert\/([^/]+)\//);
+    return m ? m[1] : '';
+  };
+
+  // For a TLS preset: pull the panel's already-configured cert + domain and
+  // seed them into the form so the preset is usable out of the box (the panel
+  // was set up with a Let's Encrypt cert at install time). Returns the domain
+  // it applied, or '' when the panel has no cert configured (caller then keeps
+  // the manual domain box visible).
+  const applyPanelCertToTls = async (): Promise<string> => {
+    const msg = await HttpUtil.post('/panel/setting/all', undefined, { silent: true });
+    if (!msg?.success) return '';
+    const obj = msg.obj as { webCertFile?: string; webKeyFile?: string; webDomain?: string };
+    const certFile = obj.webCertFile ?? '';
+    const keyFile = obj.webKeyFile ?? '';
+    if (!certFile || !keyFile) return '';
+    form.setFieldValue(
+      ['streamSettings', 'tlsSettings', 'certificates', 0, 'certificateFile'],
+      certFile,
+    );
+    form.setFieldValue(
+      ['streamSettings', 'tlsSettings', 'certificates', 0, 'keyFile'],
+      keyFile,
+    );
+    const domain = (obj.webDomain || '').trim() || domainFromCertPath(certFile);
+    if (domain) {
+      form.setFieldValue(['streamSettings', 'tlsSettings', 'serverName'], domain);
+    }
+    return domain;
+  };
+
   // Apply a one-click preset: build a full inbound row, push it into the form
   // through the same adapter buildAddModeValues() uses, then fetch Reality
-  // keys for Reality presets. The operator can still tweak anything before
-  // hitting Create — the preset only seeds a working starting point.
+  // keys (Reality presets) or auto-apply the panel cert + domain (TLS presets).
+  // The operator can still tweak anything before hitting Create.
   const applyPreset = async (preset: InboundPreset) => {
     const domain = preset.needsDomain ? presetDomain : undefined;
     const row = preset.build(domain);
@@ -532,6 +568,13 @@ export default function InboundFormModal({
     setSelectedPresetId(preset.id);
     if (preset.needsRealityKeys) {
       await genRealityKeypair();
+    }
+    if (preset.needsDomain) {
+      // Auto-fill cert + domain from the panel's own TLS config. If the panel
+      // has a cert, the preset becomes truly one-click; the domain box stays
+      // as an override.
+      const applied = await applyPanelCertToTls();
+      if (applied && !presetDomain) setPresetDomain(applied);
     }
   };
 
