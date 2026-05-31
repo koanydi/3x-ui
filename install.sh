@@ -11,6 +11,30 @@ cur_dir=$(pwd)
 xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 
+# Full-auto install mode. Enabled by XUI_AUTO=1, or implicitly when XUI_DOMAIN
+# is set (so `XUI_DOMAIN=panel.example.com bash <(curl ... install.sh)` just
+# works). In auto mode every interactive prompt takes a sensible default:
+# SQLite, random panel port, Let's Encrypt domain cert, set cert for panel.
+XUI_AUTO="${XUI_AUTO:-}"
+XUI_DOMAIN="${XUI_DOMAIN:-}"
+if [[ -n "$XUI_DOMAIN" && -z "$XUI_AUTO" ]]; then
+    XUI_AUTO=1
+fi
+
+# auto_read VAR DEFAULT PROMPT
+# In auto mode: assign DEFAULT to VAR (in the caller's scope via bash dynamic
+# scoping) and echo what was chosen. Otherwise: behave exactly like the plain
+# `read -rp PROMPT VAR` it replaces, so the interactive flow is unchanged.
+auto_read() {
+    local __av="$1" __ad="$2" __ap="$3"
+    if [[ "$XUI_AUTO" == "1" ]]; then
+        printf -v "$__av" '%s' "$__ad"
+        echo -e "${blue}[auto]${plain} ${__ap}${__ad}"
+    else
+        read -rp "$__ap" "$__av"
+    fi
+}
+
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n " && exit 1
 
@@ -440,16 +464,25 @@ ssl_cert_issue() {
     # get the domain here, and we need to verify it
     local domain=""
     while true; do
-        read -rp "Please enter your domain name: " domain
+        if [[ "$XUI_AUTO" == "1" && -n "$XUI_DOMAIN" ]]; then
+            domain="$XUI_DOMAIN"
+            echo -e "${blue}[auto]${plain} Domain: ${domain}"
+        else
+            read -rp "Please enter your domain name: " domain
+        fi
         domain="${domain// /}" # Trim whitespace
 
         if [[ -z "$domain" ]]; then
             echo -e "${red}Domain name cannot be empty. Please try again.${plain}"
+            # In auto mode XUI_DOMAIN won't change on retry — bail out instead
+            # of looping forever.
+            [[ "$XUI_AUTO" == "1" ]] && { echo -e "${red}Auto mode: XUI_DOMAIN is empty. Aborting SSL.${plain}"; return 1; }
             continue
         fi
 
         if ! is_domain "$domain"; then
             echo -e "${red}Invalid domain format: ${domain}. Please enter a valid domain name.${plain}"
+            [[ "$XUI_AUTO" == "1" ]] && { echo -e "${red}Auto mode: XUI_DOMAIN is invalid. Aborting SSL.${plain}"; return 1; }
             continue
         fi
 
@@ -511,7 +544,7 @@ ssl_cert_issue() {
     reloadCmd="systemctl restart x-ui || rc-service x-ui restart"
     echo -e "${green}Default --reloadcmd for ACME is: ${yellow}systemctl restart x-ui || rc-service x-ui restart${plain}"
     echo -e "${green}This command will run on every certificate issue and renew.${plain}"
-    read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
+    auto_read setReloadcmd "n" "Would you like to modify --reloadcmd for ACME? (y/n): "
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
         echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; systemctl restart x-ui"
         echo -e "${green}\t2.${plain} Input your own command"
@@ -577,7 +610,7 @@ ssl_cert_issue() {
     systemctl start x-ui 2> /dev/null || rc-service x-ui start 2> /dev/null
 
     # Prompt user to set panel paths after successful certificate installation
-    read -rp "Would you like to set this certificate for the panel? (y/n): " setPanel
+    auto_read setPanel "y" "Would you like to set this certificate for the panel? (y/n): "
     if [[ "$setPanel" == "y" || "$setPanel" == "Y" ]]; then
         local webCertFile="/root/cert/${domain}/fullchain.pem"
         local webKeyFile="/root/cert/${domain}/privkey.pem"
@@ -618,7 +651,14 @@ prompt_and_setup_ssl() {
     echo -e "${green}4.${plain} Skip SSL (advanced — behind reverse proxy / SSH tunnel only)"
     echo -e "${blue}Note:${plain} Options 1 & 2 require port 80 open. Option 3 requires manual paths."
     echo -e "${blue}Note:${plain} Option 4 serves the panel over plain HTTP — only safe behind nginx/Caddy or an SSH tunnel."
-    read -rp "Choose an option (default 2 for IP): " ssl_choice
+    if [[ "$XUI_AUTO" == "1" ]]; then
+        # Auto mode: domain cert when a domain was provided, else skip SSL
+        # (panel served over plain HTTP — caller is expected to front it).
+        if [[ -n "$XUI_DOMAIN" ]]; then ssl_choice="1"; else ssl_choice="4"; fi
+        echo -e "${blue}[auto]${plain} SSL choice: ${ssl_choice}"
+    else
+        read -rp "Choose an option (default 2 for IP): " ssl_choice
+    fi
     ssl_choice="${ssl_choice// /}" # Trim whitespace
 
     # Default to 2 (IP cert) if input is empty or invalid (not 1, 3 or 4)
@@ -825,7 +865,7 @@ config_after_install() {
             echo -e "${green}═══════════════════════════════════════════${plain}"
             echo -e "  1) SQLite     (default — recommended for < 1000 clients)"
             echo -e "  2) PostgreSQL (recommended for high client counts / many nodes)"
-            read -rp "Choose [1]: " db_choice
+            auto_read db_choice "1" "Choose [1]: "
             db_choice="${db_choice:-1}"
             if [[ "$db_choice" == "2" ]]; then
                 local xui_env_file
@@ -891,7 +931,7 @@ EOF
                 fi
             fi
 
-            read -rp "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: " config_confirm
+            auto_read config_confirm "n" "Would you like to customize the Panel Port settings? (If not, a random port will be applied) [y/n]: "
             if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
                 read -rp "Please set up the panel port: " config_port
                 echo -e "${yellow}Your Panel Port is: ${config_port}${plain}"
