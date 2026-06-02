@@ -20,19 +20,9 @@
 
 ---
 
-## 快速开始
+## 快速开始（一条命令全自动安装）
 
-在你的 VPS（Debian / Ubuntu / CentOS 等）上，以 root 执行一条命令即可安装：
-
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Teminuosi/3x-ui/main/install.sh)
-```
-
-安装过程会问你面板端口、账号密码、是否申请 SSL 证书等。装完后，在服务器上输入 `x-ui` 即可打开管理菜单（重启面板、查看账号、改端口、更新等）。
-
-### 全自动安装（零交互）
-
-不想被一路追问，可以用环境变量一次性跑完：
+在你的 VPS（Debian / Ubuntu / CentOS 等）上，以 root 执行下面任一条命令，零交互装完：
 
 ```bash
 # 方式一：带域名 —— 自动申请 SSL 证书并把证书配到面板，其余全部用默认值
@@ -42,11 +32,14 @@ XUI_DOMAIN=panel.example.com bash <(curl -Ls https://raw.githubusercontent.com/T
 XUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/Teminuosi/3x-ui/main/install.sh)
 ```
 
-> 设了 `XUI_DOMAIN` 会自动开启全自动模式。若你的 shell 下行内变量没生效，可以先下载再执行：
-> ```bash
-> curl -Ls https://raw.githubusercontent.com/Teminuosi/3x-ui/main/install.sh -o /tmp/i.sh
-> XUI_DOMAIN=panel.example.com bash /tmp/i.sh
-> ```
+装完后，在服务器上输入 `x-ui` 即可打开管理菜单（重启面板、查看账号、改端口、更新/卸载等）。
+
+> - 设了 `XUI_DOMAIN` 会自动开启全自动模式。若你的 shell 下行内变量没生效，可以先下载再执行：
+>   ```bash
+>   curl -Ls https://raw.githubusercontent.com/Teminuosi/3x-ui/main/install.sh -o /tmp/i.sh
+>   XUI_DOMAIN=panel.example.com bash /tmp/i.sh
+>   ```
+> - 想自己一步步选（端口、SSL 方式等），去掉环境变量直接运行同一条命令即可进入交互式安装。
 
 ### 更新 / 卸载
 
