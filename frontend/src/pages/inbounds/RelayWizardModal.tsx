@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Button, Divider, Form, Input, InputNumber, Modal, Radio, Select, Space, Typography, message } from 'antd';
 
-import { PRESET_FALLBACK } from '@/lib/xray/inbound-presets';
 import {
   RELAY_ENTRY_PRESETS,
+  RELAY_PRESET_FALLBACK,
   applyRelayToTemplate,
   buildRelayInboundPayload,
   buildRelayRule,
@@ -32,6 +32,7 @@ const LANDING_PROTOCOLS: { value: LandingProtocol; label: string }[] = [
   { value: 'shadowsocks', label: 'Shadowsocks' },
   { value: 'socks', label: 'SOCKS5' },
   { value: 'http', label: 'HTTP' },
+  { value: 'hysteria', label: 'Hysteria2' },
 ];
 
 const SS_METHODS = [
@@ -43,7 +44,8 @@ const SS_METHODS = [
 ];
 
 // Protocols whose landing config can be filled by pasting a share link.
-const LINKABLE = new Set<LandingProtocol>(['vless', 'vmess', 'trojan', 'shadowsocks']);
+const LINKABLE = new Set<LandingProtocol>(['vless', 'vmess', 'trojan', 'shadowsocks', 'hysteria']);
+const LINK_ONLY = new Set<LandingProtocol>(['hysteria']);
 
 export default function RelayWizardModal({ open, onClose, onCreated }: RelayWizardModalProps) {
   const { t } = useTranslation();
@@ -91,7 +93,8 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
   }, [open]);
 
   const canLink = LINKABLE.has(landingProtocol);
-  const effectiveMode = canLink ? inputMode : 'manual';
+  const canManual = !LINK_ONLY.has(landingProtocol);
+  const effectiveMode = canLink ? (canManual ? inputMode : 'link') : 'manual';
 
   const entryPreset = useMemo(
     () => RELAY_ENTRY_PRESETS.find((p) => p.id === entryPresetId) ?? RELAY_ENTRY_PRESETS[0],
@@ -278,7 +281,7 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
               buttonStyle="solid"
               options={RELAY_ENTRY_PRESETS.map((p) => ({
                 value: p.id,
-                label: t(p.titleKey, { defaultValue: PRESET_FALLBACK[p.id].title }),
+                label: t(p.titleKey, { defaultValue: RELAY_PRESET_FALLBACK[p.id].title }),
               }))}
             />
           </Form.Item>
@@ -297,13 +300,16 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
           <Form.Item label={t('pages.inbounds.relay.landingProtocol', { defaultValue: '落地协议' })}>
             <Select
               value={landingProtocol}
-              onChange={(v) => setLandingProtocol(v)}
+              onChange={(v) => {
+                setLandingProtocol(v);
+                if (LINK_ONLY.has(v)) setInputMode('link');
+              }}
               options={LANDING_PROTOCOLS}
               style={{ width: 220 }}
             />
           </Form.Item>
 
-          {canLink && (
+          {canLink && canManual && (
             <Form.Item label={t('pages.inbounds.relay.inputMode', { defaultValue: '填写方式' })}>
               <Radio.Group value={inputMode} onChange={(e) => setInputMode(e.target.value)}>
                 <Radio value="link">{t('pages.inbounds.relay.pasteLink', { defaultValue: '粘贴分享链接' })}</Radio>
@@ -318,7 +324,7 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
                 value={link}
                 onChange={(e) => setLink(e.target.value)}
                 rows={3}
-                placeholder="vless:// / vmess:// / trojan:// / ss://"
+                placeholder="vless:// / vmess:// / trojan:// / ss:// / hysteria2:// / hy2://"
               />
             </Form.Item>
           ) : (

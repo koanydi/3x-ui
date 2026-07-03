@@ -62,6 +62,18 @@ describe('relay landing outbound (link)', () => {
     expect(ob!.tag).toBe('relay-landing'); // remark from link is discarded
   });
 
+  it('parses a hysteria2 share link into an outbound, overriding the tag', () => {
+    const link = 'hy2://auth-secret@srv.example:443?sni=example.com#imported-hy2';
+    const ob = landingOutboundFromLink(link, 'relay-hysteria');
+    expect(ob).not.toBeNull();
+    expect(ob!.protocol).toBe('hysteria');
+    expect(ob!.tag).toBe('relay-hysteria');
+    expect(ob!.settings).toEqual({ address: 'srv.example', port: 443, version: 2 });
+    const stream = ob!.streamSettings as Record<string, unknown>;
+    expect(stream.network).toBe('hysteria');
+    expect((stream.hysteriaSettings as Record<string, unknown>).auth).toBe('auth-secret');
+  });
+
   it('returns null for an unparseable link', () => {
     expect(landingOutboundFromLink('not-a-link', 'relay-x')).toBeNull();
   });
@@ -71,6 +83,16 @@ describe('relay entry inbound payload', () => {
   it('entry presets are all cert-free (no domain needed)', () => {
     expect(RELAY_ENTRY_PRESETS.length).toBeGreaterThan(0);
     expect(RELAY_ENTRY_PRESETS.every((p) => !p.needsDomain)).toBe(true);
+  });
+
+  it('defaults to TCP Reality without Vision flow for relay speed and stability', () => {
+    expect(RELAY_ENTRY_PRESETS[0].id).toBe('vless-reality-tcp');
+    const payload = buildRelayInboundPayload(RELAY_ENTRY_PRESETS[0], { port: 20000 });
+    const settings = JSON.parse(payload.settings) as { clients: Array<{ flow?: string }> };
+    const stream = JSON.parse(payload.streamSettings) as { network: string; security: string };
+    expect(settings.clients[0].flow).toBe('');
+    expect(stream.network).toBe('tcp');
+    expect(stream.security).toBe('reality');
   });
 
   it('applies remark/port and injects the reality key pair', () => {

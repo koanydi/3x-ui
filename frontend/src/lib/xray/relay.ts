@@ -3,16 +3,56 @@ import {
   rawInboundToFormValues,
   type WireInboundPayload,
 } from '@/lib/xray/inbound-form-adapter';
-import { INBOUND_PRESETS, type InboundPreset } from '@/lib/xray/inbound-presets';
+import { INBOUND_PRESETS, PRESET_FALLBACK, type InboundPreset } from '@/lib/xray/inbound-presets';
 import { parseOutboundLink } from '@/lib/xray/outbound-link-parser';
 import type { XraySettingsValue } from '@/schemas/xray';
 
 // Relay entries are always cert-free (Reality) presets — a relay node users
 // connect to shouldn't need a domain/cert. The landing side carries the
 // protocol variety instead.
-export const RELAY_ENTRY_PRESETS: readonly InboundPreset[] = INBOUND_PRESETS.filter(
-  (p) => !p.needsDomain,
-);
+export type RelayEntryPresetId = InboundPreset['id'] | 'vless-reality-tcp';
+
+export type RelayEntryPreset = Omit<InboundPreset, 'id'> & {
+  id: RelayEntryPresetId;
+};
+
+const BASE_REALITY_PRESETS = INBOUND_PRESETS.filter((p) => !p.needsDomain);
+const VISION_PRESET = BASE_REALITY_PRESETS.find((p) => p.id === 'vless-reality-vision');
+const GRPC_PRESET = BASE_REALITY_PRESETS.find((p) => p.id === 'vless-reality-grpc');
+
+const RELAY_TCP_PRESET: RelayEntryPreset | null = VISION_PRESET
+  ? {
+      ...VISION_PRESET,
+      id: 'vless-reality-tcp',
+      titleKey: 'pages.inbounds.presets.vlessRealityTcp.title',
+      descKey: 'pages.inbounds.presets.vlessRealityTcp.desc',
+      build: () => {
+        const row = VISION_PRESET.build();
+        const settings = row.settings as { clients?: Array<{ flow?: string }> } | undefined;
+        if (Array.isArray(settings?.clients)) {
+          settings.clients = settings.clients.map((client) => ({ ...client, flow: '' }));
+        }
+        return row;
+      },
+    }
+  : null;
+
+export const RELAY_ENTRY_PRESETS: readonly RelayEntryPreset[] = [
+  ...(RELAY_TCP_PRESET ? [RELAY_TCP_PRESET] : []),
+  ...(VISION_PRESET ? [VISION_PRESET] : []),
+  ...(GRPC_PRESET ? [GRPC_PRESET] : []),
+  ...BASE_REALITY_PRESETS.filter(
+    (p) => p.id !== 'vless-reality-vision' && p.id !== 'vless-reality-grpc',
+  ),
+];
+
+export const RELAY_PRESET_FALLBACK: Record<RelayEntryPresetId, { title: string; desc: string }> = {
+  ...PRESET_FALLBACK,
+  'vless-reality-tcp': {
+    title: 'VLESS + Reality (TCP)',
+    desc: 'TCP Reality without Vision flow, built for faster relay entry stability',
+  },
+};
 
 // Relay (中转) wiring helpers. A relay setup = a local inbound users connect
 // to (the entry, built from a one-click preset) + an outbound that forwards to
@@ -20,7 +60,14 @@ export const RELAY_ENTRY_PRESETS: readonly InboundPreset[] = INBOUND_PRESETS.fil
 // traffic to that outbound. These pure builders own the outbound + rule + the
 // immutable template splice; the wizard handles the API orchestration.
 
-export type LandingProtocol = 'vless' | 'vmess' | 'trojan' | 'shadowsocks' | 'socks' | 'http';
+export type LandingProtocol =
+  | 'vless'
+  | 'vmess'
+  | 'trojan'
+  | 'shadowsocks'
+  | 'socks'
+  | 'http'
+  | 'hysteria';
 
 // An outbound object as it lives in xraySetting.outbounds[]. Kept loose to
 // match the template schema (z.object(...).loose()).
@@ -221,7 +268,7 @@ export interface RelayEntryOverrides {
 // preset, applying remark/port and the fetched Reality key pair. Mirrors the
 // path InboundFormModal.submit() uses: preset row → form values → wire payload.
 export function buildRelayInboundPayload(
-  preset: InboundPreset,
+  preset: RelayEntryPreset,
   ov: RelayEntryOverrides = {},
 ): WireInboundPayload {
   const values = rawInboundToFormValues(preset.build()) as unknown as Record<string, unknown>;

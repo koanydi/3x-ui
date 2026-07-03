@@ -474,7 +474,7 @@ ssl_cert_issue() {
 
         if [[ -z "$domain" ]]; then
             echo -e "${red}Domain name cannot be empty. Please try again.${plain}"
-            # In auto mode XUI_DOMAIN won't change on retry — bail out instead
+            # In auto mode XUI_DOMAIN won't change on retry �?bail out instead
             # of looping forever.
             [[ "$XUI_AUTO" == "1" ]] && { echo -e "${red}Auto mode: XUI_DOMAIN is empty. Aborting SSL.${plain}"; return 1; }
             continue
@@ -648,12 +648,12 @@ prompt_and_setup_ssl() {
     echo -e "${green}1.${plain} Let's Encrypt for Domain (90-day validity, auto-renews)"
     echo -e "${green}2.${plain} Let's Encrypt for IP Address (6-day validity, auto-renews)"
     echo -e "${green}3.${plain} Custom SSL Certificate (Path to existing files)"
-    echo -e "${green}4.${plain} Skip SSL (advanced — behind reverse proxy / SSH tunnel only)"
+    echo -e "${green}4.${plain} Skip SSL (advanced �?behind reverse proxy / SSH tunnel only)"
     echo -e "${blue}Note:${plain} Options 1 & 2 require port 80 open. Option 3 requires manual paths."
-    echo -e "${blue}Note:${plain} Option 4 serves the panel over plain HTTP — only safe behind nginx/Caddy or an SSH tunnel."
+    echo -e "${blue}Note:${plain} Option 4 serves the panel over plain HTTP �?only safe behind nginx/Caddy or an SSH tunnel."
     if [[ "$XUI_AUTO" == "1" ]]; then
         # Auto mode: domain cert when a domain was provided, else skip SSL
-        # (panel served over plain HTTP — caller is expected to front it).
+        # (panel served over plain HTTP �?caller is expected to front it).
         if [[ -n "$XUI_DOMAIN" ]]; then ssl_choice="1"; else ssl_choice="4"; fi
         echo -e "${blue}[auto]${plain} SSL choice: ${ssl_choice}"
     else
@@ -678,7 +678,7 @@ prompt_and_setup_ssl() {
 
                 if [[ -n "${cert_domain}" ]]; then
                     SSL_HOST="${cert_domain}"
-                    echo -e "${green}✓ SSL certificate configured successfully with domain: ${cert_domain}${plain}"
+                    echo -e "${green}�?SSL certificate configured successfully with domain: ${cert_domain}${plain}"
                 else
                     echo -e "${yellow}SSL setup may have completed, but domain extraction failed${plain}"
                     SSL_HOST="${server_ip}"
@@ -707,9 +707,9 @@ prompt_and_setup_ssl() {
             setup_ip_certificate "${server_ip}" "${ipv6_addr}"
             if [ $? -eq 0 ]; then
                 SSL_HOST="${server_ip}"
-                echo -e "${green}✓ Let's Encrypt IP certificate configured successfully${plain}"
+                echo -e "${green}�?Let's Encrypt IP certificate configured successfully${plain}"
             else
-                echo -e "${red}✗ IP certificate setup failed. Please check port 80 is open.${plain}"
+                echo -e "${red}�?IP certificate setup failed. Please check port 80 is open.${plain}"
                 SSL_HOST="${server_ip}"
             fi
             ;;
@@ -768,31 +768,31 @@ prompt_and_setup_ssl() {
                 SSL_HOST="${server_ip}"
             fi
 
-            echo -e "${green}✓ Custom certificate paths applied.${plain}"
+            echo -e "${green}�?Custom certificate paths applied.${plain}"
             echo -e "${yellow}Note: You are responsible for renewing these files externally.${plain}"
 
             systemctl restart x-ui > /dev/null 2>&1 || rc-service x-ui restart > /dev/null 2>&1
             ;;
         4)
             echo ""
-            echo -e "${red}⚠ Panel will be installed WITHOUT SSL/TLS.${plain}"
+            echo -e "${red}�?Panel will be installed WITHOUT SSL/TLS.${plain}"
             echo -e "${yellow}Login credentials and cookies will travel as plain HTTP.${plain}"
             echo -e "${yellow}Only safe when:${plain}"
-            echo -e "${yellow}  • A reverse proxy (nginx, Caddy, Traefik) terminates TLS for you, or${plain}"
-            echo -e "${yellow}  • You access the panel exclusively via SSH tunnel${plain}"
+            echo -e "${yellow}  �?A reverse proxy (nginx, Caddy, Traefik) terminates TLS for you, or${plain}"
+            echo -e "${yellow}  �?You access the panel exclusively via SSH tunnel${plain}"
             echo ""
 
             SSL_SCHEME="http"
             SSL_HOST="${server_ip}"
 
             local bind_local=""
-            auto_read bind_local "n" "Bind the panel to 127.0.0.1 only? (recommended — forces SSH tunnel / reverse-proxy access) [y/N]: "
+            auto_read bind_local "n" "Bind the panel to 127.0.0.1 only? (recommended �?forces SSH tunnel / reverse-proxy access) [y/N]: "
             if [[ "$bind_local" == "y" || "$bind_local" == "Y" ]]; then
                 ${xui_folder}/x-ui setting -listenIP "127.0.0.1" > /dev/null 2>&1
                 SSL_HOST="127.0.0.1"
-                echo -e "${green}✓ Panel bound to 127.0.0.1 only. It is now unreachable from the public internet.${plain}"
+                echo -e "${green}�?Panel bound to 127.0.0.1 only. It is now unreachable from the public internet.${plain}"
                 echo ""
-                echo -e "${green}SSH Port Forwarding — open the panel from your local machine via:${plain}"
+                echo -e "${green}SSH Port Forwarding �?open the panel from your local machine via:${plain}"
                 echo -e "  Standard SSH command:"
                 echo -e "  ${yellow}ssh -L 2222:127.0.0.1:${panel_port} root@${server_ip}${plain}"
                 echo -e "  If using an SSH key:"
@@ -806,7 +806,7 @@ prompt_and_setup_ssl() {
             fi
 
             systemctl restart x-ui > /dev/null 2>&1 || rc-service x-ui restart > /dev/null 2>&1
-            echo -e "${green}✓ SSL setup skipped.${plain}"
+            echo -e "${green}�?SSL setup skipped.${plain}"
             ;;
         *)
             echo -e "${red}Invalid option. Skipping SSL setup.${plain}"
@@ -866,10 +866,10 @@ config_after_install() {
 
             local db_label="SQLite (/etc/x-ui/x-ui.db)"
             echo ""
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${green}     Database Selection                    ${plain}"
-            echo -e "${green}═══════════════════════════════════════════${plain}"
-            echo -e "  1) SQLite     (default — recommended for < 1000 clients)"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
+            echo -e "  1) SQLite     (default �?recommended for < 1000 clients)"
             echo -e "  2) PostgreSQL (recommended for high client counts / many nodes)"
             auto_read db_choice "1" "Choose [1]: "
             db_choice="${db_choice:-1}"
@@ -902,7 +902,7 @@ config_after_install() {
                         done
                         db_label="PostgreSQL (external)"
                     else
-                        echo -e "${yellow}Installing PostgreSQL — this may take a moment...${plain}"
+                        echo -e "${yellow}Installing PostgreSQL �?this may take a moment...${plain}"
                         if xui_dsn=$(install_postgres_local); then
                             db_label="PostgreSQL (xui@127.0.0.1:5432/xui)"
                         else
@@ -949,9 +949,9 @@ EOF
             ${xui_folder}/x-ui setting -username "${config_username}" -password "${config_password}" -port "${config_port}" -webBasePath "${config_webBasePath}"
 
             echo ""
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${green}     SSL Certificate Setup (RECOMMENDED)   ${plain}"
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${yellow}SSL is strongly recommended. Skip only if a reverse proxy${plain}"
             echo -e "${yellow}or SSH tunnel handles TLS for you.${plain}"
             echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
@@ -964,9 +964,9 @@ EOF
 
             # Display final credentials and access information
             echo ""
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${green}     Panel Installation Complete!         ${plain}"
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${green}Username:    ${config_username}${plain}"
             echo -e "${green}Password:    ${config_password}${plain}"
             echo -e "${green}Port:        ${config_port}${plain}"
@@ -974,12 +974,12 @@ EOF
             echo -e "${green}Database:    ${db_label}${plain}"
             echo -e "${green}Access URL:  ${SSL_SCHEME}://${SSL_HOST}:${config_port}/${config_webBasePath}${plain}"
             echo -e "${green}API Token:   ${config_apiToken}${plain}"
-            echo -e "${green}═══════════════════════════════════════════${plain}"
-            echo -e "${yellow}⚠ IMPORTANT: Save these credentials securely!${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
+            echo -e "${yellow}�?IMPORTANT: Save these credentials securely!${plain}"
             if [[ "$SSL_SCHEME" == "https" ]]; then
-                echo -e "${yellow}⚠ SSL Certificate: Enabled and configured${plain}"
+                echo -e "${yellow}�?SSL Certificate: Enabled and configured${plain}"
             else
-                echo -e "${yellow}⚠ SSL Certificate: Skipped — panel is HTTP-only. Use a reverse proxy or SSH tunnel.${plain}"
+                echo -e "${yellow}�?SSL Certificate: Skipped �?panel is HTTP-only. Use a reverse proxy or SSH tunnel.${plain}"
             fi
         else
             local config_webBasePath=$(gen_random_string 18)
@@ -990,9 +990,9 @@ EOF
             # If the panel is already installed but no certificate is configured, prompt for SSL now
             if [[ -z "${existing_cert}" ]]; then
                 echo ""
-                echo -e "${green}═══════════════════════════════════════════${plain}"
+                echo -e "${green}══════════════════════════════════════════�?{plain}"
                 echo -e "${green}     SSL Certificate Setup (RECOMMENDED)   ${plain}"
-                echo -e "${green}═══════════════════════════════════════════${plain}"
+                echo -e "${green}══════════════════════════════════════════�?{plain}"
                 echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
                 echo ""
                 prompt_and_setup_ssl "${existing_port}" "${config_webBasePath}" "${server_ip}"
@@ -1023,9 +1023,9 @@ EOF
         existing_cert=$(${xui_folder}/x-ui setting -getCert true | grep 'cert:' | awk -F': ' '{print $2}' | tr -d '[:space:]')
         if [[ -z "$existing_cert" ]]; then
             echo ""
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${green}     SSL Certificate Setup (RECOMMENDED)   ${plain}"
-            echo -e "${green}═══════════════════════════════════════════${plain}"
+            echo -e "${green}══════════════════════════════════════════�?{plain}"
             echo -e "${yellow}Let's Encrypt now supports both domains and IP addresses!${plain}"
             echo ""
             prompt_and_setup_ssl "${existing_port}" "${existing_webBasePath}" "${server_ip}"
@@ -1033,7 +1033,7 @@ EOF
         else
             echo -e "${green}SSL certificate already configured. No action needed.${plain}"
             # Re-install over an existing config prints nothing actionable above,
-            # so surface the access URL here (cert present → https).
+            # so surface the access URL here (cert present �?https).
             [[ -n "$server_ip" ]] && echo -e "${green}Access URL: https://${server_ip}:${existing_port}/${existing_webBasePath}${plain}"
         fi
     fi
@@ -1046,17 +1046,17 @@ install_x-ui() {
 
     # Download resources
     if [ $# == 0 ]; then
-        tag_version=$(curl -Ls "https://api.github.com/repos/Teminuosi/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        tag_version=$(curl -Ls "https://api.github.com/repos/koanydi/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ ! -n "$tag_version" ]]; then
             echo -e "${yellow}Trying to fetch version with IPv4...${plain}"
-            tag_version=$(curl -4 -Ls "https://api.github.com/repos/Teminuosi/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+            tag_version=$(curl -4 -Ls "https://api.github.com/repos/koanydi/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
             if [[ ! -n "$tag_version" ]]; then
                 echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
                 exit 1
             fi
         fi
         echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/Teminuosi/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
+        curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/koanydi/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
             exit 1
@@ -1071,7 +1071,7 @@ install_x-ui() {
             exit 1
         fi
 
-        url="https://github.com/Teminuosi/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
+        url="https://github.com/koanydi/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
         echo -e "Beginning to install x-ui $1"
         curl -4fLRo ${xui_folder}-linux-$(arch).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
@@ -1079,7 +1079,7 @@ install_x-ui() {
             exit 1
         fi
     fi
-    curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/Teminuosi/3x-ui/main/x-ui.sh
+    curl -4fLRo /usr/bin/x-ui-temp https://raw.githubusercontent.com/koanydi/3x-ui/main/x-ui.sh
     if [[ $? -ne 0 ]]; then
         echo -e "${red}Failed to download x-ui.sh${plain}"
         exit 1
@@ -1131,7 +1131,7 @@ install_x-ui() {
     fi
 
     if [[ $release == "alpine" ]]; then
-        curl -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/Teminuosi/3x-ui/main/x-ui.rc
+        curl -4fLRo /etc/init.d/x-ui https://raw.githubusercontent.com/koanydi/3x-ui/main/x-ui.rc
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Failed to download x-ui.rc${plain}"
             exit 1
@@ -1188,13 +1188,13 @@ install_x-ui() {
             echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
             case "${release}" in
                 ubuntu | debian | armbian)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/Teminuosi/3x-ui/main/x-ui.service.debian > /dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/koanydi/3x-ui/main/x-ui.service.debian > /dev/null 2>&1
                     ;;
                 arch | manjaro | parch)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/Teminuosi/3x-ui/main/x-ui.service.arch > /dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/koanydi/3x-ui/main/x-ui.service.arch > /dev/null 2>&1
                     ;;
                 *)
-                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/Teminuosi/3x-ui/main/x-ui.service.rhel > /dev/null 2>&1
+                    curl -4fLRo ${xui_service}/x-ui.service https://raw.githubusercontent.com/koanydi/3x-ui/main/x-ui.service.rhel > /dev/null 2>&1
                     ;;
             esac
 
@@ -1222,24 +1222,24 @@ install_x-ui() {
     echo -e ""
     echo -e "${yellow}Tip: run ${green}x-ui settings${plain}${yellow} on the server anytime to view the panel URL, username and password.${plain}"
     echo -e ""
-    echo -e "┌───────────────────────────────────────────────────────┐
-│  ${blue}x-ui control menu usages (subcommands):${plain}              │
-│                                                       │
-│  ${blue}x-ui${plain}              - Admin Management Script          │
-│  ${blue}x-ui start${plain}        - Start                            │
-│  ${blue}x-ui stop${plain}         - Stop                             │
-│  ${blue}x-ui restart${plain}      - Restart                          │
-│  ${blue}x-ui status${plain}       - Current Status                   │
-│  ${blue}x-ui settings${plain}     - Current Settings                 │
-│  ${blue}x-ui enable${plain}       - Enable Autostart on OS Startup   │
-│  ${blue}x-ui disable${plain}      - Disable Autostart on OS Startup  │
-│  ${blue}x-ui log${plain}          - Check logs                       │
-│  ${blue}x-ui banlog${plain}       - Check Fail2ban ban logs          │
-│  ${blue}x-ui update${plain}       - Update                           │
-│  ${blue}x-ui legacy${plain}       - Legacy version                   │
-│  ${blue}x-ui install${plain}      - Install                          │
-│  ${blue}x-ui uninstall${plain}    - Uninstall                        │
-└───────────────────────────────────────────────────────┘"
+    echo -e "┌───────────────────────────────────────────────────────�?
+�? ${blue}x-ui control menu usages (subcommands):${plain}              �?
+�?                                                      �?
+�? ${blue}x-ui${plain}              - Admin Management Script          �?
+�? ${blue}x-ui start${plain}        - Start                            �?
+�? ${blue}x-ui stop${plain}         - Stop                             �?
+�? ${blue}x-ui restart${plain}      - Restart                          �?
+�? ${blue}x-ui status${plain}       - Current Status                   �?
+�? ${blue}x-ui settings${plain}     - Current Settings                 �?
+�? ${blue}x-ui enable${plain}       - Enable Autostart on OS Startup   �?
+�? ${blue}x-ui disable${plain}      - Disable Autostart on OS Startup  �?
+�? ${blue}x-ui log${plain}          - Check logs                       �?
+�? ${blue}x-ui banlog${plain}       - Check Fail2ban ban logs          �?
+�? ${blue}x-ui update${plain}       - Update                           �?
+�? ${blue}x-ui legacy${plain}       - Legacy version                   �?
+�? ${blue}x-ui install${plain}      - Install                          �?
+�? ${blue}x-ui uninstall${plain}    - Uninstall                        �?
+└───────────────────────────────────────────────────────�?
 }
 
 echo -e "${green}Running...${plain}"
