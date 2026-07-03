@@ -94,6 +94,33 @@ func TestInboundMarshalJSONInvalidTextFallsBackToString(t *testing.T) {
 	}
 }
 
+func TestHysteriaGenXrayInboundConfigUsesUsers(t *testing.T) {
+	in := Inbound{
+		Protocol: Hysteria,
+		Settings: `{"version":2,"clients":[{"auth":"secret","email":"hy@example.com"}]}`,
+	}
+	cfg := in.GenXrayInboundConfig()
+
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(cfg.Settings), &settings); err != nil {
+		t.Fatalf("settings should be valid JSON: %v", err)
+	}
+	if _, ok := settings["clients"]; ok {
+		t.Fatalf("hysteria runtime settings must not include clients: %s", cfg.Settings)
+	}
+	users, ok := settings["users"].([]any)
+	if !ok || len(users) != 1 {
+		t.Fatalf("expected one hysteria user, got %#v", settings["users"])
+	}
+	user, ok := users[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected user object, got %#v", users[0])
+	}
+	if user["auth"] != "secret" || user["email"] != "hy@example.com" {
+		t.Fatalf("unexpected hysteria user: %#v", user)
+	}
+}
+
 func TestClientRecordMarshalJSONNestsReverse(t *testing.T) {
 	rec := ClientRecord{Id: 1, Email: "alice@example.com", Reverse: `{"tag":"vless-in"}`}
 	out, err := json.Marshal(rec)

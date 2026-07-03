@@ -189,8 +189,15 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		}
 
 		_, hadClients := settings["clients"]
+		_, hadUsers := settings["users"]
 		mutated := hadClients || len(finalClients) > 0
-		if mutated {
+		if inbound.Protocol == model.Hysteria {
+			mutated = hadClients || hadUsers || len(finalClients) > 0
+			if mutated {
+				settings["users"] = finalClients
+				delete(settings, "clients")
+			}
+		} else if mutated {
 			settings["clients"] = finalClients
 		}
 

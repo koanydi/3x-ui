@@ -233,6 +233,10 @@ func (i *Inbound) GenXrayInboundConfig() *xray.InboundConfig {
 		if stripped, ok := StripVlessInboundEncryption(settings); ok {
 			settings = stripped
 		}
+	case Hysteria:
+		if normalized, ok := HysteriaSettingsClientsToUsers(settings); ok {
+			settings = normalized
+		}
 	}
 	return &xray.InboundConfig{
 		Listen:         json_util.RawMessage(listen),
@@ -243,6 +247,33 @@ func (i *Inbound) GenXrayInboundConfig() *xray.InboundConfig {
 		Tag:            i.Tag,
 		Sniffing:       json_util.RawMessage(i.Sniffing),
 	}
+}
+
+// HysteriaSettingsClientsToUsers translates the panel's stored clients array
+// into Xray's runtime users array. Xray's Hysteria inbound reads users, while
+// the panel keeps clients for shared client-management code.
+func HysteriaSettingsClientsToUsers(settings string) (string, bool) {
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(settings), &parsed); err != nil || parsed == nil {
+		return settings, false
+	}
+
+	clients, hasClients := parsed["clients"]
+	_, hasUsers := parsed["users"]
+	if !hasClients && !hasUsers {
+		return settings, false
+	}
+
+	if hasClients {
+		parsed["users"] = clients
+	}
+	delete(parsed, "clients")
+
+	normalized, err := json.Marshal(parsed)
+	if err != nil {
+		return settings, false
+	}
+	return string(normalized), true
 }
 
 func StripVmessClientSecurity(settings string) (string, bool) {
