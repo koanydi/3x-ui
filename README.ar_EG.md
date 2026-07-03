@@ -25,7 +25,7 @@
 ## البدء السريع
 
 ```
-bash <(curl -Ls https://raw.githubusercontent.com/Teminuosi/3x-ui/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/koanydi/3x-ui/main/install.sh)
 ```
 
 للحصول على الوثائق الكاملة، يرجى زيارة [ويكي المشروع](https://github.com/MHSanaei/3x-ui/wiki).
