@@ -167,7 +167,7 @@ legacy_version() {
         exit 1
     fi
     # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/mhsanaei/3x-ui/v$tag_version/install.sh") v$tag_version"
+    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/koanydi/3x-ui/v$tag_version/install.sh") v$tag_version"
 
     echo "Downloading and installing panel version $tag_version..."
     eval $install_command
@@ -221,7 +221,7 @@ uninstall() {
     echo ""
     echo -e "Uninstalled Successfully.\n"
     echo "If you need to install this panel again, you can use below command:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/koanydi/3x-ui/main/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap delete_script SIGTERM
@@ -311,7 +311,7 @@ check_config() {
         dsn="$(grep -E '^XUI_DB_DSN=' "$db_env_file" | head -1 | cut -d= -f2-)"
         local dsn_safe
         dsn_safe="$(echo "$dsn" | sed -E 's|(://[^:/@]+:)[^@]+@|\1****@|')"
-        echo -e "${green}Database: PostgreSQL �?${dsn_safe}${plain}"
+        echo -e "${green}Database: PostgreSQL - ${dsn_safe}${plain}"
     else
         echo -e "${green}Database: SQLite (/etc/x-ui/x-ui.db)${plain}"
     fi
@@ -359,7 +359,7 @@ check_config() {
             echo -e "${green}Access URL: https://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
         fi
     else
-        echo -e "${red}�?WARNING: No SSL certificate configured!${plain}"
+        echo -e "${red}WARNING: No SSL certificate configured!${plain}"
         echo -e "${yellow}You can get a Let's Encrypt certificate for your IP address (valid ~6 days, auto-renews).${plain}"
         read -rp "Generate SSL certificate for IP now? [y/N]: " gen_ssl
         if [[ "$gen_ssl" == "y" || "$gen_ssl" == "Y" ]]; then
@@ -2277,67 +2277,69 @@ SSH_port_forwarding() {
 }
 
 show_usage() {
-    echo -e "┌────────────────────────────────────────────────────────────────�?
-�? ${blue}x-ui control menu usages (subcommands):${plain}                       �?
-�?                                                               �?
-�? ${blue}x-ui${plain}                       - Admin Management Script          �?
-�? ${blue}x-ui start${plain}                 - Start                            �?
-�? ${blue}x-ui stop${plain}                  - Stop                             �?
-�? ${blue}x-ui restart${plain}               - Restart                          �?
-|  ${blue}x-ui restart-xray${plain}          - Restart Xray                     �?
-�? ${blue}x-ui status${plain}                - Current Status                   �?
-�? ${blue}x-ui settings${plain}              - Current Settings                 �?
-�? ${blue}x-ui enable${plain}                - Enable Autostart on OS Startup   �?
-�? ${blue}x-ui disable${plain}               - Disable Autostart on OS Startup  �?
-�? ${blue}x-ui log${plain}                   - Check logs                       �?
-�? ${blue}x-ui banlog${plain}                - Check Fail2ban ban logs          �?
-�? ${blue}x-ui update${plain}                - Update                           �?
-�? ${blue}x-ui update-all-geofiles${plain}   - Update all geo files             �?
-�? ${blue}x-ui legacy${plain}                - Legacy version                   �?
-�? ${blue}x-ui install${plain}               - Install                          �?
-�? ${blue}x-ui uninstall${plain}             - Uninstall                        �?
-└────────────────────────────────────────────────────────────────�?
+    cat <<EOF
+------------------------------------------------------------
+${blue}x-ui control menu usages (subcommands):${plain}
+
+${blue}x-ui${plain}                       - Admin Management Script
+${blue}x-ui start${plain}                 - Start
+${blue}x-ui stop${plain}                  - Stop
+${blue}x-ui restart${plain}               - Restart
+${blue}x-ui restart-xray${plain}          - Restart Xray
+${blue}x-ui status${plain}                - Current Status
+${blue}x-ui settings${plain}              - Current Settings
+${blue}x-ui enable${plain}                - Enable Autostart on OS Startup
+${blue}x-ui disable${plain}               - Disable Autostart on OS Startup
+${blue}x-ui log${plain}                   - Check logs
+${blue}x-ui banlog${plain}                - Check Fail2ban ban logs
+${blue}x-ui update${plain}                - Update
+${blue}x-ui update-all-geofiles${plain}   - Update all geo files
+${blue}x-ui legacy${plain}                - Legacy version
+${blue}x-ui install${plain}               - Install
+${blue}x-ui uninstall${plain}             - Uninstall
+------------------------------------------------------------
+EOF
 }
 
 show_menu() {
-    echo -e "
-╔────────────────────────────────────────────────�?
-�?  ${green}3X-UI Panel Management Script${plain}                �?
-�?  ${green}0.${plain} Exit Script                               �?
-│────────────────────────────────────────────────�?
-�?  ${green}1.${plain} Install                                   �?
-�?  ${green}2.${plain} Update                                    �?
-�?  ${green}3.${plain} Update Menu                               �?
-�?  ${green}4.${plain} Legacy Version                            �?
-�?  ${green}5.${plain} Uninstall                                 �?
-│────────────────────────────────────────────────�?
-�?  ${green}6.${plain} Reset Username & Password                 �?
-�?  ${green}7.${plain} Reset Web Base Path                       �?
-�?  ${green}8.${plain} Reset Settings                            �?
-�?  ${green}9.${plain} Change Port                               �?
-�? ${green}10.${plain} View Current Settings                     �?
-│────────────────────────────────────────────────�?
-�? ${green}11.${plain} Start                                     �?
-�? ${green}12.${plain} Stop                                      �?
-�? ${green}13.${plain} Restart                                   �?
-|  ${green}14.${plain} Restart Xray                              �?
-�? ${green}15.${plain} Check Status                              �?
-�? ${green}16.${plain} Logs Management                           �?
-│────────────────────────────────────────────────�?
-�? ${green}17.${plain} Enable Autostart                          �?
-�? ${green}18.${plain} Disable Autostart                         �?
-│────────────────────────────────────────────────�?
-�? ${green}19.${plain} SSL Certificate Management                �?
-�? ${green}20.${plain} Cloudflare SSL Certificate                �?
-�? ${green}21.${plain} IP Limit Management                       �?
-�? ${green}22.${plain} Firewall Management                       �?
-�? ${green}23.${plain} SSH Port Forwarding Management            �?
-│────────────────────────────────────────────────�?
-�? ${green}24.${plain} Enable BBR                                �?
-�? ${green}25.${plain} Update Geo Files                          �?
-�? ${green}26.${plain} Speedtest by Ookla                        �?
-╚────────────────────────────────────────────────�?
-"
+    cat <<EOF
+------------------------------------------------------------
+${green}3X-UI Panel Management Script${plain}
+${green}0.${plain} Exit Script
+------------------------------------------------------------
+${green}1.${plain} Install
+${green}2.${plain} Update
+${green}3.${plain} Update Menu
+${green}4.${plain} Legacy Version
+${green}5.${plain} Uninstall
+------------------------------------------------------------
+${green}6.${plain} Reset Username & Password
+${green}7.${plain} Reset Web Base Path
+${green}8.${plain} Reset Settings
+${green}9.${plain} Change Port
+${green}10.${plain} View Current Settings
+------------------------------------------------------------
+${green}11.${plain} Start
+${green}12.${plain} Stop
+${green}13.${plain} Restart
+${green}14.${plain} Restart Xray
+${green}15.${plain} Check Status
+${green}16.${plain} Logs Management
+------------------------------------------------------------
+${green}17.${plain} Enable Autostart
+${green}18.${plain} Disable Autostart
+------------------------------------------------------------
+${green}19.${plain} SSL Certificate Management
+${green}20.${plain} Cloudflare SSL Certificate
+${green}21.${plain} IP Limit Management
+${green}22.${plain} Firewall Management
+${green}23.${plain} SSH Port Forwarding Management
+------------------------------------------------------------
+${green}24.${plain} Enable BBR
+${green}25.${plain} Update Geo Files
+${green}26.${plain} Speedtest by Ookla
+------------------------------------------------------------
+EOF
     show_status
     echo && read -rp "Please enter your selection [0-26]: " num
 
