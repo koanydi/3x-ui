@@ -295,6 +295,12 @@ interface InboundFormModalProps {
   availableNodes?: NodeRecord[];
 }
 
+type PanelTlsInfo = {
+  certFile: string;
+  keyFile: string;
+  domain: string;
+};
+
 function buildAddModeValues(): InboundFormValues {
   const settings = createDefaultInboundSettings('vless') ?? undefined;
   return rawInboundToFormValues({
@@ -333,6 +339,7 @@ export default function InboundFormModal({
   // active so we can show its domain input (TLS presets) and highlight it.
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [presetDomain, setPresetDomain] = useState('');
+  const [panelTlsInfo, setPanelTlsInfo] = useState<PanelTlsInfo>({ certFile: '', keyFile: '', domain: '' });
   // "Recommend protocol" toggle (add mode). ON → show the one-click preset
   // gallery with the recommended preset pre-applied. OFF → hide the gallery
   // and reveal the protocol/stream/security/sniffing/advanced tabs for manual
@@ -532,17 +539,25 @@ export default function InboundFormModal({
     return m ? m[1] : '';
   };
 
+  const fetchPanelTlsInfo = async (): Promise<PanelTlsInfo> => {
+    const msg = await HttpUtil.post('/panel/setting/all', undefined, { silent: true });
+    if (!msg?.success) return { certFile: '', keyFile: '', domain: '' };
+    const obj = msg.obj as { webCertFile?: string; webKeyFile?: string; webDomain?: string };
+    const certFile = obj.webCertFile ?? '';
+    const keyFile = obj.webKeyFile ?? '';
+    const domain = (obj.webDomain || '').trim() || domainFromCertPath(certFile);
+    const info = { certFile, keyFile, domain };
+    setPanelTlsInfo(info);
+    return info;
+  };
+
   // For a TLS preset: pull the panel's already-configured cert + domain and
   // seed them into the form so the preset is usable out of the box (the panel
   // was set up with a Let's Encrypt cert at install time). Returns the domain
   // it applied, or '' when the panel has no cert configured (caller then keeps
   // the manual domain box visible).
   const applyPanelCertToTls = async (): Promise<string> => {
-    const msg = await HttpUtil.post('/panel/setting/all', undefined, { silent: true });
-    if (!msg?.success) return '';
-    const obj = msg.obj as { webCertFile?: string; webKeyFile?: string; webDomain?: string };
-    const certFile = obj.webCertFile ?? '';
-    const keyFile = obj.webKeyFile ?? '';
+    const { certFile, keyFile, domain } = await fetchPanelTlsInfo();
     if (!certFile || !keyFile) return '';
     form.setFieldValue(
       ['streamSettings', 'tlsSettings', 'certificates', 0, 'certificateFile'],
@@ -552,7 +567,6 @@ export default function InboundFormModal({
       ['streamSettings', 'tlsSettings', 'certificates', 0, 'keyFile'],
       keyFile,
     );
-    const domain = (obj.webDomain || '').trim() || domainFromCertPath(certFile);
     if (domain) {
       form.setFieldValue(['streamSettings', 'tlsSettings', 'serverName'], domain);
     }
@@ -608,16 +622,7 @@ export default function InboundFormModal({
     setSaving(true);
     try {
       // Detect panel cert + domain.
-      let certFile = '';
-      let keyFile = '';
-      let domain = '';
-      const settingMsg = await HttpUtil.post('/panel/setting/all', undefined, { silent: true });
-      if (settingMsg?.success) {
-        const obj = settingMsg.obj as { webCertFile?: string; webKeyFile?: string; webDomain?: string };
-        certFile = obj.webCertFile ?? '';
-        keyFile = obj.webKeyFile ?? '';
-        domain = (obj.webDomain || '').trim() || domainFromCertPath(certFile);
-      }
+      const { certFile, keyFile, domain } = await fetchPanelTlsInfo();
       const hasCert = !!(certFile && keyFile && domain);
 
       // Shared subId so all batch-created nodes land in one subscription.
@@ -928,6 +933,8 @@ export default function InboundFormModal({
   useEffect(() => {
     if (!open) return;
     setPresetDomain('');
+    setPanelTlsInfo({ certFile: '', keyFile: '', domain: '' });
+    void fetchPanelTlsInfo();
     setFallbacks([]);
     if (mode === 'edit' && dbInbound) {
       form.resetFields();
@@ -1080,6 +1087,13 @@ export default function InboundFormModal({
     : t('create');
 
   const activePreset = INBOUND_PRESETS.find((p) => p.id === selectedPresetId) ?? null;
+  const hasPanelDomainCert = !!(panelTlsInfo.certFile && panelTlsInfo.keyFile && panelTlsInfo.domain);
+  const presetDesc = (preset: InboundPreset) => {
+    const fallback = PRESET_FALLBACK[preset.id].desc;
+    const desc = t(preset.descKey, { defaultValue: fallback });
+    if (!preset.needsDomain || !hasPanelDomainCert) return desc;
+    return desc.replace('需域名与证书', '已有域名证书可配置');
+  };
 
   // One-click preset gallery — add mode only. Each card seeds a full working
   // inbound; TLS presets reveal a domain input once selected.
@@ -1119,10 +1133,16 @@ export default function InboundFormModal({
                   {t(preset.titleKey, { defaultValue: PRESET_FALLBACK[preset.id].title })}
                 </Typography.Text>
                 {preset.recommended && <Tag color="green" style={{ marginInlineEnd: 0 }}>{t('recommend', { defaultValue: '推荐' })}</Tag>}
-                {preset.needsDomain && <Tag color="orange" style={{ marginInlineEnd: 0 }}>{t('pages.inbounds.presets.needDomain', { defaultValue: '需域名' })}</Tag>}
+                {preset.needsDomain && (
+                  <Tag color={hasPanelDomainCert ? 'blue' : 'orange'} style={{ marginInlineEnd: 0 }}>
+                    {hasPanelDomainCert
+                      ? t('pages.inbounds.presets.readyDomainCert', { defaultValue: '已有域名证书可配置' })
+                      : t('pages.inbounds.presets.needDomain', { defaultValue: '需域名' })}
+                  </Tag>
+                )}
               </Space>
               <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 12 }}>
-                {t(preset.descKey, { defaultValue: PRESET_FALLBACK[preset.id].desc })}
+                {presetDesc(preset)}
               </Typography.Paragraph>
             </Card>
           );
@@ -1131,7 +1151,9 @@ export default function InboundFormModal({
       {activePreset?.needsDomain && (
         <div style={{ marginTop: 12 }}>
           <Typography.Text style={{ fontSize: 12 }}>
-            {t('pages.inbounds.presets.domainLabel', { defaultValue: '域名（解析到本机，并需配置证书）' })}
+            {hasPanelDomainCert
+              ? t('pages.inbounds.presets.domainReadyLabel', { defaultValue: '域名（已从面板证书自动填入，可按需修改）' })
+              : t('pages.inbounds.presets.domainLabel', { defaultValue: '域名（解析到本机，并需配置证书）' })}
           </Typography.Text>
           <Input
             style={{ marginTop: 4 }}
