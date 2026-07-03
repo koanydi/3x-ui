@@ -3,13 +3,12 @@ import {
   rawInboundToFormValues,
   type WireInboundPayload,
 } from '@/lib/xray/inbound-form-adapter';
-import { INBOUND_PRESETS, PRESET_FALLBACK, type InboundPreset } from '@/lib/xray/inbound-presets';
+import { INBOUND_PRESETS, PRESET_FALLBACK, applyPresetSecrets, type InboundPreset } from '@/lib/xray/inbound-presets';
 import { parseOutboundLink } from '@/lib/xray/outbound-link-parser';
 import type { XraySettingsValue } from '@/schemas/xray';
 
-// Relay entries are always cert-free (Reality) presets — a relay node users
-// connect to shouldn't need a domain/cert. The landing side carries the
-// protocol variety instead.
+// Relay entry presets are the protocols users connect to on the relay host.
+// Reality entries are cert-free; HY2 reuses the panel's configured domain cert.
 export type RelayEntryPresetId = InboundPreset['id'] | 'vless-reality-tcp';
 
 export type RelayEntryPreset = Omit<InboundPreset, 'id'> & {
@@ -19,6 +18,7 @@ export type RelayEntryPreset = Omit<InboundPreset, 'id'> & {
 const BASE_REALITY_PRESETS = INBOUND_PRESETS.filter((p) => !p.needsDomain);
 const VISION_PRESET = BASE_REALITY_PRESETS.find((p) => p.id === 'vless-reality-vision');
 const GRPC_PRESET = BASE_REALITY_PRESETS.find((p) => p.id === 'vless-reality-grpc');
+const HYSTERIA2_PRESET = INBOUND_PRESETS.find((p) => p.id === 'hysteria2');
 
 const RELAY_TCP_PRESET: RelayEntryPreset | null = VISION_PRESET
   ? {
@@ -41,6 +41,7 @@ export const RELAY_ENTRY_PRESETS: readonly RelayEntryPreset[] = [
   ...(RELAY_TCP_PRESET ? [RELAY_TCP_PRESET] : []),
   ...(VISION_PRESET ? [VISION_PRESET] : []),
   ...(GRPC_PRESET ? [GRPC_PRESET] : []),
+  ...(HYSTERIA2_PRESET ? [HYSTERIA2_PRESET] : []),
   ...BASE_REALITY_PRESETS.filter(
     (p) => p.id !== 'vless-reality-vision' && p.id !== 'vless-reality-grpc',
   ),
@@ -262,6 +263,10 @@ export interface RelayEntryOverrides {
   // Reality key pair fetched from the panel (GET /panel/api/server/getNewX25519Cert).
   realityPrivateKey?: string;
   realityPublicKey?: string;
+  // Panel TLS cert used by HY2/TLS relay entries.
+  certFile?: string;
+  keyFile?: string;
+  domain?: string;
 }
 
 // Build the wire payload for the relay's entry inbound from a (cert-free)
@@ -271,7 +276,11 @@ export function buildRelayInboundPayload(
   preset: RelayEntryPreset,
   ov: RelayEntryOverrides = {},
 ): WireInboundPayload {
-  const values = rawInboundToFormValues(preset.build()) as unknown as Record<string, unknown>;
+  const row = preset.build(preset.needsDomain ? ov.domain : undefined);
+  if (preset.needsDomain) {
+    applyPresetSecrets(row, { certFile: ov.certFile, keyFile: ov.keyFile, domain: ov.domain });
+  }
+  const values = rawInboundToFormValues(row) as unknown as Record<string, unknown>;
   if (ov.remark != null) values.remark = ov.remark;
   if (ov.port != null && ov.port > 0) values.port = ov.port;
   // Tag the entry inbound so the lists can badge it as a relay. Port keeps it

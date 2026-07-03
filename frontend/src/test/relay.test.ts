@@ -80,9 +80,11 @@ describe('relay landing outbound (link)', () => {
 });
 
 describe('relay entry inbound payload', () => {
-  it('entry presets are all cert-free (no domain needed)', () => {
+  it('includes stable Reality entries plus an HY2 entry option', () => {
     expect(RELAY_ENTRY_PRESETS.length).toBeGreaterThan(0);
-    expect(RELAY_ENTRY_PRESETS.every((p) => !p.needsDomain)).toBe(true);
+    expect(RELAY_ENTRY_PRESETS.map((p) => p.id)).toEqual(
+      expect.arrayContaining(['vless-reality-tcp', 'vless-reality-vision', 'vless-reality-grpc', 'hysteria2']),
+    );
   });
 
   it('defaults to TCP Reality without Vision flow for relay speed and stability', () => {
@@ -93,6 +95,29 @@ describe('relay entry inbound payload', () => {
     expect(settings.clients[0].flow).toBe('');
     expect(stream.network).toBe('tcp');
     expect(stream.security).toBe('reality');
+  });
+
+  it('builds an HY2 relay entry with the panel certificate', () => {
+    const preset = RELAY_ENTRY_PRESETS.find((p) => p.id === 'hysteria2');
+    expect(preset).toBeTruthy();
+    const payload = buildRelayInboundPayload(preset!, {
+      port: 24443,
+      certFile: '/root/cert/uio.166881.xyz/fullchain.pem',
+      keyFile: '/root/cert/uio.166881.xyz/privkey.pem',
+      domain: 'uio.166881.xyz',
+    });
+    expect(payload.protocol).toBe('hysteria');
+    expect(payload.tag).toBe('relay-in-24443');
+    const stream = JSON.parse(payload.streamSettings) as {
+      network: string;
+      security: string;
+      tlsSettings: { serverName: string; certificates: Array<{ certificateFile: string; keyFile: string }> };
+    };
+    expect(stream.network).toBe('hysteria');
+    expect(stream.security).toBe('tls');
+    expect(stream.tlsSettings.serverName).toBe('uio.166881.xyz');
+    expect(stream.tlsSettings.certificates[0].certificateFile).toBe('/root/cert/uio.166881.xyz/fullchain.pem');
+    expect(stream.tlsSettings.certificates[0].keyFile).toBe('/root/cert/uio.166881.xyz/privkey.pem');
   });
 
   it('applies remark/port and injects the reality key pair', () => {

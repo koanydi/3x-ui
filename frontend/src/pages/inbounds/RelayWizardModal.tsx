@@ -47,6 +47,18 @@ const SS_METHODS = [
 const LINKABLE = new Set<LandingProtocol>(['vless', 'vmess', 'trojan', 'shadowsocks', 'hysteria']);
 const LINK_ONLY = new Set<LandingProtocol>(['hysteria']);
 
+type PanelTlsInfo = {
+  certFile: string;
+  keyFile: string;
+  domain: string;
+};
+
+function domainFromCertPath(certPath: string): string {
+  const norm = certPath.replace(/\\/g, '/');
+  const m = norm.match(/\/cert\/([^/]+)\//);
+  return m ? m[1] : '';
+}
+
 export default function RelayWizardModal({ open, onClose, onCreated }: RelayWizardModalProps) {
   const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage();
@@ -95,6 +107,16 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
   const canLink = LINKABLE.has(landingProtocol);
   const canManual = !LINK_ONLY.has(landingProtocol);
   const effectiveMode = canLink ? (canManual ? inputMode : 'link') : 'manual';
+
+  const fetchPanelTlsInfo = async (): Promise<PanelTlsInfo> => {
+    const msg = await HttpUtil.post('/panel/setting/all', undefined, { silent: true });
+    if (!msg?.success) return { certFile: '', keyFile: '', domain: '' };
+    const obj = msg.obj as { webCertFile?: string; webKeyFile?: string; webDomain?: string };
+    const certFile = obj.webCertFile ?? '';
+    const keyFile = obj.webKeyFile ?? '';
+    const domain = (obj.webDomain || '').trim() || domainFromCertPath(certFile);
+    return { certFile, keyFile, domain };
+  };
 
   const entryPreset = useMemo(
     () => RELAY_ENTRY_PRESETS.find((p) => p.id === entryPresetId) ?? RELAY_ENTRY_PRESETS[0],
@@ -173,17 +195,33 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
     if (!entryPreset) return;
     setBusy(true);
     try {
-      // 1) Reality keys for the entry inbound.
+      // 1) Entry preset secrets (Reality keys or panel TLS cert).
       let priv = '';
       let pub = '';
-      const keyMsg = await HttpUtil.get('/panel/api/server/getNewX25519Cert');
-      if (keyMsg?.success && keyMsg.obj) {
-        const obj = keyMsg.obj as { privateKey: string; publicKey: string };
-        priv = obj.privateKey;
-        pub = obj.publicKey;
-      } else {
-        messageApi.error(t('pages.inbounds.relay.keyFailed', { defaultValue: '获取 Reality 密钥失败' }));
-        return;
+      if (entryPreset.needsRealityKeys) {
+        const keyMsg = await HttpUtil.get('/panel/api/server/getNewX25519Cert');
+        if (keyMsg?.success && keyMsg.obj) {
+          const obj = keyMsg.obj as { privateKey: string; publicKey: string };
+          priv = obj.privateKey;
+          pub = obj.publicKey;
+        } else {
+          messageApi.error(t('pages.inbounds.relay.keyFailed', { defaultValue: '获取 Reality 密钥失败' }));
+          return;
+        }
+      }
+
+      let certFile = '';
+      let keyFile = '';
+      let domain = '';
+      if (entryPreset.needsDomain) {
+        const tls = await fetchPanelTlsInfo();
+        certFile = tls.certFile;
+        keyFile = tls.keyFile;
+        domain = tls.domain;
+        if (!certFile || !keyFile || !domain) {
+          messageApi.error(t('pages.inbounds.relay.needPanelCert', { defaultValue: 'HY2 入口需要先配置面板域名证书' }));
+          return;
+        }
       }
 
       // 2) Create the entry inbound, read back its server-generated tag.
@@ -192,6 +230,9 @@ export default function RelayWizardModal({ open, onClose, onCreated }: RelayWiza
         port,
         realityPrivateKey: priv,
         realityPublicKey: pub,
+        certFile,
+        keyFile,
+        domain,
       });
       const addMsg = await HttpUtil.post('/panel/api/inbounds/add', payload);
       if (!addMsg?.success) {
